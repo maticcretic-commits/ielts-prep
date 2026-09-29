@@ -102,7 +102,119 @@ footer{border-top:1px solid var(--line);margin-top:34px;padding:26px 0 46px;colo
 <nav class="tabs"><div class="shell tabs-inner"><button class="tab" data-tab="plan">Start here</button><button class="tab" data-tab="listening">Listening</button><button class="tab" data-tab="reading">Reading</button><button class="tab" data-tab="writing">Writing</button><button class="tab" data-tab="speaking">Speaking</button><button class="tab" data-tab="grammar">Grammar</button><button class="tab" data-tab="vocabulary">Vocabulary</button><button class="tab" data-tab="study">Study chapters</button><button class="tab" data-tab="practice">Practice quiz</button><button class="tab" data-tab="resources">Resources</button><button class="tab" data-tab="strategy">Plans & scores</button><button class="tab" data-tab="important-videos">Videos</button><button class="tab" data-tab="topics">One-liners</button><button class="tab" data-tab="capsules">Capsules</button><button class="tab" data-tab="comments">Comments</button></div></nav>
 <div class="shell">
 
-<section class="panel" id="panel-plan">
+
+<!-- UX-UPGRADE-20260930 -->
+<style>
+.sf-wrap{margin:16px 0;max-width:680px}
+#sfSearch{width:100%;padding:12px 16px;font-size:16px;border-radius:12px;border:1px solid rgba(127,127,127,.4);background:rgba(127,127,127,.08);color:inherit;box-sizing:border-box}
+#sfSearch::placeholder{color:inherit;opacity:.6}
+.sf-trending{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:13px}
+.sf-chip{padding:6px 12px;border-radius:999px;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;cursor:pointer;font-size:13px}
+.sf-chip:hover{background:rgba(127,127,127,.18)}
+#sfResults{list-style:none;margin:8px 0 0;padding:0;border:1px solid rgba(127,127,127,.35);border-radius:12px;overflow:hidden}
+#sfResults[hidden]{display:none}
+#sfResults li{margin:0;padding:0}
+#sfResults a{display:block;padding:10px 14px;color:inherit;text-decoration:none;font-size:14px;border-bottom:1px solid rgba(127,127,127,.15)}
+#sfResults li:last-child a{border-bottom:0}
+#sfResults a:hover{background:rgba(127,127,127,.18)}
+.sf-flash{outline:2px solid #f59e0b !important;outline-offset:3px;border-radius:6px}
+.fresh-strip{margin:14px 0;max-width:680px;border:1px solid rgba(127,127,127,.3);border-radius:14px;padding:12px 16px;background:rgba(127,127,127,.06)}
+.fresh-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.fresh-badge{background:#16a34a;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.fresh-strip time{font-size:13px;opacity:.75}
+.fresh-strip ul{margin:0;padding-left:18px;font-size:14px}
+.fresh-strip li{margin:4px 0}
+.fresh-strip a{color:inherit}
+.issue-note{font-size:13px;opacity:.85;margin:10px 0 0}
+</style>
+<div class="sf-wrap" role="search" aria-label="Search this study site">
+<input type="search" id="sfSearch" placeholder="Search chapters, topics, questions&hellip;" autocomplete="off" aria-label="Search chapters, topics and questions">
+<div class="sf-trending"><span>Trending:</span><span id="sfChips"></span></div>
+<ul id="sfResults" hidden></ul>
+</div>
+<section class="fresh-strip" id="fresh-today" aria-label="New today">
+<div class="fresh-head"><span class="fresh-badge">New today</span><time datetime="2026-09-30">30 September 2026</time></div>
+<ul>
+<li>Fresh capsules and practice questions are added here every morning.</li>
+</ul>
+</section>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var input = document.getElementById('sfSearch');
+  if (!input || input.dataset.sfInit) return;
+  input.dataset.sfInit = '1';
+  var res = document.getElementById('sfResults');
+  var chipsBox = document.getElementById('sfChips');
+  var root = document.querySelector('main') || document.body;
+  var items = [], seen = {};
+  root.querySelectorAll('h2, h3').forEach(function(h, i){
+    if (h.closest('header, nav, footer, #comments')) return;
+    var t = (h.textContent || '').trim().replace(/\s+/g, ' ');
+    if (t.length < 3 || t.length > 90) return;
+    var k = t.toLowerCase();
+    if (seen[k]) return;
+    seen[k] = 1;
+    if (!h.id) h.id = 'sf-h' + i;
+    items.push({t: t, id: h.id, sec: h.closest('section')});
+  });
+  // Trending: first h3 from up to 5 distinct content sections
+  var trend = [], usedSec = {};
+  items.forEach(function(it){
+    if (trend.length >= 5) return;
+    var s = it.sec, key = s ? (s.id || s.className || items.indexOf(it)) : items.indexOf(it);
+    if (usedSec[key]) return;
+    usedSec[key] = 1;
+    trend.push(it);
+  });
+  if (trend.length >= 2) {
+    trend.forEach(function(it){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'sf-chip';
+      b.textContent = it.t.length > 42 ? it.t.slice(0, 42) + '…' : it.t;
+      b.setAttribute('aria-label', 'Search for ' + it.t);
+      b.addEventListener('click', function(){
+        input.value = it.t; doSearch(it.t); input.focus();
+      });
+      chipsBox.appendChild(b);
+    });
+  } else if (chipsBox && chipsBox.parentElement) {
+    chipsBox.parentElement.style.display = 'none';
+  }
+  function go(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({behavior: 'smooth', block: 'start'});
+    el.classList.add('sf-flash');
+    setTimeout(function(){ el.classList.remove('sf-flash'); }, 1600);
+  }
+  function doSearch(q){
+    q = (q || '').trim().toLowerCase();
+    res.innerHTML = '';
+    if (q.length < 2) { res.hidden = true; return; }
+    var hits = items.filter(function(it){ return it.t.toLowerCase().indexOf(q) > -1; }).slice(0, 10);
+    if (!hits.length) { res.hidden = true; return; }
+    hits.forEach(function(it){
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + it.id; a.textContent = it.t;
+      a.addEventListener('click', function(e){ e.preventDefault(); res.hidden = true; go(it.id); });
+      li.appendChild(a); res.appendChild(li);
+    });
+    res.hidden = false;
+  }
+  input.addEventListener('input', function(){ doSearch(input.value); });
+  input.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') {
+      var first = res.querySelector('a');
+      if (first && !res.hidden) { e.preventDefault(); res.hidden = true; go(first.getAttribute('href').slice(1)); }
+    }
+    if (e.key === 'Escape') { res.hidden = true; }
+  });
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('.sf-wrap')) res.hidden = true;
+  });
+});
+</script><section class="panel" id="panel-plan">
   <div class="card">
     <h2>Start here: how IELTS works</h2>
     <p>IELTS has <strong>four sections</strong> — Listening (~30 min, 40 questions), Reading (60 min, 40 questions), Writing (60 min, 2 tasks) and Speaking (11–14 min, 3 parts) — each scored on the <strong>0–9 band scale</strong>. Your overall band is the average of the four, rounded to the nearest half band.</p>
@@ -316,6 +428,7 @@ footer{border-top:1px solid var(--line);margin-top:34px;padding:26px 0 46px;colo
 <section class="panel" id="panel-practice">
   <div class="quiz-card">
     <h2>Practice quiz — 477 explained questions</h2>
+<p class="issue-note">Spotted a mistake in a question? <a href="https://github.com/maticcretic-commits/ielts-prep/issues">Report it here</a> &mdash; corrections go live in the next daily refresh.</p>
     <div class="quiz-tools">
       <label>Category: <select id="catFilter"><option value="all">All categories</option><option>Grammar</option><option>Vocabulary</option><option>Reading</option><option>Listening</option><option>Writing &amp; Speaking</option></select></label>
       <button class="btn secondary" id="resetBtn">Reset quiz</button>
